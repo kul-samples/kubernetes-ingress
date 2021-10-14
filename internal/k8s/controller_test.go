@@ -1978,292 +1978,165 @@ func TestGetWAFPoliciesForAppProtectLogConf(t *testing.T) {
 	}
 }
 
-func TestAddDosPolicyRefs(t *testing.T) {
-	apDosPol := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"namespace": "default",
-				"name":      "apdos-pol",
-			},
-		},
+func TestGenerateDosProtectedEx(t *testing.T) {
+	lbc := LoadBalancerController{
+		appProtectDosConfiguration: appprotectdos.NewFakeConfiguration(),
 	}
-
 	dosLogConf := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
 				"namespace": "default",
-				"name":      "dosLog-conf",
+				"name":      "dosLogConf",
 			},
 		},
 	}
-
-	tests := []struct {
-		policies            []*conf_v1.Policy
-		expectedApDosPolRefs   map[string]*unstructured.Unstructured
-		expectedDosLogConfRefs map[string]*unstructured.Unstructured
-		wantErr             bool
-		msg                 string
-	}{
-		{
-			policies: []*conf_v1.Policy{
-				{
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "dos-pol",
-						Namespace: "default",
-					},
-					Spec: conf_v1.PolicySpec{
-						Dos: &conf_v1.Dos{
-							Enable:   true,
-							Name: "dos",
-							ApDosPolicy: "default/apdos-pol",
-							DosSecurityLog: &conf_v1.DosSecurityLog{
-								Enable:    true,
-								ApDosLogConf: "dosLog-conf",
-							},
-							ApDosMonitor: "example.com",
-							DosAccessLogDest: "10.10.1.1:514",
-						},
-					},
-				},
+	dosPolicy := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"namespace": "default",
+				"name":      "dosPolicy",
 			},
-			expectedApDosPolRefs: map[string]*unstructured.Unstructured{
-				"default/apdos-pol": apDosPol,
-			},
-			expectedDosLogConfRefs: map[string]*unstructured.Unstructured{
-				"default/dosLog-conf": dosLogConf,
-			},
-			wantErr: false,
-			msg:     "base test",
-		},
-		{
-			policies: []*conf_v1.Policy{
-				{
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "dos-pol",
-						Namespace: "default",
-					},
-					Spec: conf_v1.PolicySpec{
-						Dos: &conf_v1.Dos{
-							Enable:   true,
-							ApDosPolicy: "non-existing-apdos-pol",
-						},
-					},
-				},
-			},
-			wantErr:             true,
-			expectedApDosPolRefs:   make(map[string]*unstructured.Unstructured),
-			expectedDosLogConfRefs: make(map[string]*unstructured.Unstructured),
-			msg:                 "apDosPol doesn't exist",
-		},
-		{
-			policies: []*conf_v1.Policy{
-				{
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "Dos-pol",
-						Namespace: "default",
-					},
-					Spec: conf_v1.PolicySpec{
-						Dos: &conf_v1.Dos{
-							Enable:   true,
-							ApDosPolicy: "apdos-pol",
-							DosSecurityLog: &conf_v1.DosSecurityLog{
-								Enable:    true,
-								ApDosLogConf: "non-existing-dos-log-conf",
-							},
-						},
-					},
-				},
-			},
-			wantErr: true,
-			expectedApDosPolRefs: map[string]*unstructured.Unstructured{
-				"default/apdos-pol": apDosPol,
-			},
-			expectedDosLogConfRefs: make(map[string]*unstructured.Unstructured),
-			msg:                 "dosLogConf doesn't exist",
 		},
 	}
-
-	lbc := LoadBalancerController{
-		appProtectDosConfiguration: appprotectdos.NewFakeConfiguration(),
+	dosProtectedOnly := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"namespace": "default",
+				"name":      "dosOnly",
+			},
+		},
 	}
-	lbc.appProtectDosConfiguration.AddOrUpdatePolicy(apDosPol)
+	dosProtectedWithLogConf := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"namespace": "default",
+				"name":      "dosWithLogConf",
+			},
+			"spec": map[string]interface{}{
+				"dosSecurityLog": map[string]interface{}{
+					"apDosLogConf": "dosLogConf",
+				},
+			},
+		},
+	}
+	dosProtectedWithPolicy := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"namespace": "default",
+				"name":      "dosWithPolicy",
+			},
+			"spec": map[string]interface{}{
+				"apDosPolicy": "dosPolicy",
+			},
+		},
+	}
+	dosProtectedWithInvlaidLogConf := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"namespace": "default",
+				"name":      "dosWithInvalidLogConf",
+			},
+			"spec": map[string]interface{}{
+				"dosSecurityLog": map[string]interface{}{
+					"apDosLogConf": "invalid-dosLogConf",
+				},
+			},
+		},
+	}
+	dosProtectedWithInvalidPolicy := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"namespace": "default",
+				"name":      "dosWithInvalidPolicy",
+			},
+			"spec": map[string]interface{}{
+				"apDosPolicy": "invalid-dosPolicy",
+			},
+		},
+	}
+	lbc.appProtectDosConfiguration.AddOrUpdateProtectedResource(dosProtectedOnly)
+	lbc.appProtectDosConfiguration.AddOrUpdateProtectedResource(dosProtectedWithLogConf)
+	lbc.appProtectDosConfiguration.AddOrUpdateProtectedResource(dosProtectedWithPolicy)
+	lbc.appProtectDosConfiguration.AddOrUpdateProtectedResource(dosProtectedWithInvlaidLogConf)
+	lbc.appProtectDosConfiguration.AddOrUpdateProtectedResource(dosProtectedWithInvalidPolicy)
 	lbc.appProtectDosConfiguration.AddOrUpdateLogConf(dosLogConf)
-
-	for _, test := range tests {
-		resApDosPolicy := make(map[string]*unstructured.Unstructured)
-		resDosLogConf := make(map[string]*unstructured.Unstructured)
-
-		if err := lbc.addDosPolicyRefs(resApDosPolicy, resDosLogConf, test.policies); (err != nil) != test.wantErr {
-			t.Errorf("LoadBalancerController.addDosPolicyRefs() error = %v, wantErr %v", err, test.wantErr)
-		}
-		if diff := cmp.Diff(test.expectedApDosPolRefs, resApDosPolicy); diff != "" {
-			t.Errorf("LoadBalancerController.addDosPolicyRefs() '%v' mismatch (-want +got):\n%s", test.msg, diff)
-		}
-		if diff := cmp.Diff(test.expectedDosLogConfRefs, resDosLogConf); diff != "" {
-			t.Errorf("LoadBalancerController.addDosPolicyRefs() '%v' mismatch (-want +got):\n%s", test.msg, diff)
-		}
-	}
-}
-
-func TestGetDosPoliciesForAppProtectDosPolicy(t *testing.T) {
-	apDosPol := &conf_v1.Policy{
-		Spec: conf_v1.PolicySpec{
-			Dos: &conf_v1.Dos{
-				Enable:   true,
-				ApDosPolicy: "ns1/apDosPol",
-			},
-		},
-	}
-
-	apDosPolNs2 := &conf_v1.Policy{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Namespace: "ns1",
-		},
-		Spec: conf_v1.PolicySpec{
-			Dos: &conf_v1.Dos{
-				Enable:   true,
-				ApDosPolicy: "ns2/apDosPol",
-			},
-		},
-	}
-
-	apDosPolNoNs := &conf_v1.Policy{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Namespace: "default",
-		},
-		Spec: conf_v1.PolicySpec{
-			Dos: &conf_v1.Dos{
-				Enable:   true,
-				ApDosPolicy: "apDosPol",
-			},
-		},
-	}
-
-	policies := []*conf_v1.Policy{
-		apDosPol, apDosPolNs2, apDosPolNoNs,
-	}
+	lbc.appProtectDosConfiguration.AddOrUpdatePolicy(dosPolicy)
 
 	tests := []struct {
-		pols []*conf_v1.Policy
-		key  string
-		want []*conf_v1.Policy
-		msg  string
+		namespace string
+		ref       string
+		expected  *configs.DosProtectedEx
+		msg       string
+		error     string
 	}{
 		{
-			pols: policies,
-			key:  "ns1/apDosPol",
-			want: []*conf_v1.Policy{apDosPol},
-			msg:  "Dos pols that ref apDosPol which has a namepace",
+			namespace: "default",
+			ref:       "dosOnly",
+			expected: &configs.DosProtectedEx{
+				DosProtected: dosProtectedOnly,
+			},
+			msg: "return the referenced resource, use parent namespace",
 		},
 		{
-			pols: policies,
-			key:  "default/apDosPol",
-			want: []*conf_v1.Policy{apDosPolNoNs},
-			msg:  "Dos pols that ref apDosPol which has no namepace",
+			namespace: "",
+			ref:       "default/dosOnly",
+			expected: &configs.DosProtectedEx{
+				DosProtected: dosProtectedOnly,
+			},
+			msg: "return the referenced resource, use own namespace",
 		},
 		{
-			pols: policies,
-			key:  "ns2/apDosPol",
-			want: []*conf_v1.Policy{apDosPolNs2},
-			msg:  "Dos pols that ref apDosPol which is in another ns",
+			namespace: "default",
+			ref:       "dosNotExist",
+			error:     "dos protected resources reference 'default/dosNotExist' is invalid: App Protect Dos LogConf default/dosNotExist not found",
+			msg:       "fails to find the referenced resource",
 		},
 		{
-			pols: policies,
-			key:  "ns1/apDosPol-with-no-valid-refs",
-			want: nil,
-			msg:  "Dos pols where there is no valid ref",
+			namespace: "default",
+			ref:       "default/dosWithLogConf",
+			expected: &configs.DosProtectedEx{
+				DosProtected: dosProtectedWithLogConf,
+				DosLogConf:   dosLogConf,
+			},
+			msg: "return the referenced resource, including reference to logconf",
+		},
+		{
+			namespace: "default",
+			ref:       "default/dosWithPolicy",
+			expected: &configs.DosProtectedEx{
+				DosProtected: dosProtectedWithPolicy,
+				DosPolicy:    dosPolicy,
+			},
+			msg: "return the referenced resource, including reference to policy",
+		},
+		{
+			namespace: "default",
+			ref:       "default/dosWithInvalidLogConf",
+			error:     "dos logconf default/invalid-dosLogConf is invalid: App Protect Dos LogConf default/invalid-dosLogConf not found",
+			msg:       "fails to find the referenced logconf resource",
+		},
+		{
+			namespace: "default",
+			ref:       "default/dosWithInvalidPolicy",
+			error:     "dos policy reference 'default/invalid-dosPolicy' is invalid: App Protect Dos Policy default/invalid-dosPolicy not found",
+			msg:       "fails to find the referenced policy resource",
 		},
 	}
 	for _, test := range tests {
-		got := getDosPoliciesForAppProtectDosPolicy(test.pols, test.key)
-		if diff := cmp.Diff(test.want, got); diff != "" {
-			t.Errorf("getDosPoliciesForAppProtectDosPolicy() returned unexpected result for the case of: %v (-want +got):\n%s", test.msg, diff)
+		dosEx, err := lbc.generateDosProtectedEx(test.namespace, test.ref)
+		if err != nil {
+			if test.error != "" {
+				// we expect an error, check if it matches
+				if test.error != err.Error() {
+					t.Errorf("generateDosProtectedEx() returned different error than expected for the case of: %v \nexpected error '%v' \nactual error '%v' \n", test.msg, test.error, err.Error())
+				}
+				// all good
+			} else {
+				t.Errorf("generateDosProtectedEx() returned unexpected error for the case of: %v \n%v", test.msg, err)
+			}
 		}
-	}
-}
-
-func TestGetDosPoliciesForAppProtectLogConf(t *testing.T) {
-	logConf := &conf_v1.Policy{
-		Spec: conf_v1.PolicySpec{
-			Dos: &conf_v1.Dos{
-				Enable: true,
-				DosSecurityLog: &conf_v1.DosSecurityLog{
-					Enable:    true,
-					ApDosLogConf: "ns1/logConf",
-				},
-			},
-		},
-	}
-
-	logConfNs2 := &conf_v1.Policy{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Namespace: "ns1",
-		},
-		Spec: conf_v1.PolicySpec{
-			Dos: &conf_v1.Dos{
-				Enable: true,
-				DosSecurityLog: &conf_v1.DosSecurityLog{
-					Enable:    true,
-					ApDosLogConf: "ns2/logConf",
-				},
-			},
-		},
-	}
-
-	logConfNoNs := &conf_v1.Policy{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Namespace: "default",
-		},
-		Spec: conf_v1.PolicySpec{
-			Dos: &conf_v1.Dos{
-				Enable: true,
-				DosSecurityLog: &conf_v1.DosSecurityLog{
-					Enable:    true,
-					ApDosLogConf: "logConf",
-				},
-			},
-		},
-	}
-
-	policies := []*conf_v1.Policy{
-		logConf, logConfNs2, logConfNoNs,
-	}
-
-	tests := []struct {
-		pols []*conf_v1.Policy
-		key  string
-		want []*conf_v1.Policy
-		msg  string
-	}{
-		{
-			pols: policies,
-			key:  "ns1/logConf",
-			want: []*conf_v1.Policy{logConf},
-			msg:  "Dos pols that ref logConf which has a namepace",
-		},
-		{
-			pols: policies,
-			key:  "default/logConf",
-			want: []*conf_v1.Policy{logConfNoNs},
-			msg:  "Dos pols that ref logConf which has no namepace",
-		},
-		{
-			pols: policies,
-			key:  "ns2/logConf",
-			want: []*conf_v1.Policy{logConfNs2},
-			msg:  "Dos pols that ref logConf which is in another ns",
-		},
-		{
-			pols: policies,
-			key:  "ns1/logConf-with-no-valid-refs",
-			want: nil,
-			msg:  "Dos pols where there is no valid logConf ref",
-		},
-	}
-	for _, test := range tests {
-		got := getDosPoliciesForAppProtectLogConf(test.pols, test.key)
-		if diff := cmp.Diff(test.want, got); diff != "" {
-			t.Errorf("getDosPoliciesForAppProtectLogConf() returned unexpected result for the case of: %v (-want +got):\n%s", test.msg, diff)
+		if diff := cmp.Diff(test.expected, dosEx); diff != "" {
+			t.Errorf("generateDosProtectedEx() returned unexpected result for the case of: %v (-want +got):\n%s", test.msg, diff)
 		}
 	}
 }
