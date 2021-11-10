@@ -64,7 +64,7 @@ type VirtualServerEx struct {
 	ApPolRefs           map[string]*unstructured.Unstructured
 	LogConfRefs         map[string]*unstructured.Unstructured
 	DosProtectedRefs    map[string]*unstructured.Unstructured
-	DosProtectedEx      *DosProtectedEx
+	DosProtectedEx      map[string]*DosProtectedEx
 }
 
 func (vsx *VirtualServerEx) String() string {
@@ -279,7 +279,7 @@ func (vsc *virtualServerConfigurator) generateEndpointsForUpstream(
 func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 	vsEx *VirtualServerEx,
 	apResources *appProtectResourcesForVS,
-	dosResources *appProtectDosResources,
+	dosResources map[string]*appProtectDosResources,
 ) (version2.VirtualServerConfig, Warnings) {
 	vsc.clearWarnings()
 
@@ -299,7 +299,11 @@ func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 		vsName:         vsEx.VirtualServer.Name,
 	}
 	policiesCfg := vsc.generatePolicies(ownerDetails, vsEx.VirtualServer.Spec.Policies, vsEx.Policies, specContext, policyOpts)
-	dosCfg := vsc.generateDosCfg(dosResources)
+	vsDosCfg := dosResources[""]
+	var dosCfg *version2.Dos
+	if vsDosCfg != nil {
+		dosCfg = vsc.generateDosCfg(vsDosCfg)
+	}
 
 	// crUpstreams maps an UpstreamName to its conf_v1.Upstream as they are generated
 	// necessary for generateLocation to know what Upstream each Location references
@@ -423,6 +427,8 @@ func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 		}
 		limitReqZones = append(limitReqZones, routePoliciesCfg.LimitReqZones...)
 
+		dosRouteCfg := vsc.generateDosCfg(dosResources[r.Path])
+
 		if len(r.Matches) > 0 {
 			cfg := generateMatchesConfig(
 				r,
@@ -441,6 +447,7 @@ func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 				"", "",
 			)
 			addPoliciesCfgToLocations(routePoliciesCfg, cfg.Locations)
+			addDosConfigToLocations(dosRouteCfg, cfg.Locations)
 
 			maps = append(maps, cfg.Maps...)
 			locations = append(locations, cfg.Locations...)
@@ -452,6 +459,7 @@ func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 			cfg := generateDefaultSplitsConfig(r, virtualServerUpstreamNamer, crUpstreams, variableNamer, len(splitClients),
 				vsc.cfgParams, r.ErrorPages, errorPageIndex, r.Path, vsLocSnippets, vsc.enableSnippets, len(returnLocations), isVSR, "", "")
 			addPoliciesCfgToLocations(routePoliciesCfg, cfg.Locations)
+			addDosConfigToLocations(dosRouteCfg, cfg.Locations)
 
 			splitClients = append(splitClients, cfg.SplitClients...)
 			locations = append(locations, cfg.Locations...)
@@ -466,6 +474,7 @@ func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 			loc, returnLoc := generateLocation(r.Path, upstreamName, upstream, r.Action, vsc.cfgParams, r.ErrorPages, false,
 				errorPageIndex, proxySSLName, r.Path, vsLocSnippets, vsc.enableSnippets, len(returnLocations), isVSR, "", "")
 			addPoliciesCfgToLocation(routePoliciesCfg, &loc)
+			loc.Dos = dosRouteCfg
 
 			locations = append(locations, loc)
 			if returnLoc != nil {
@@ -639,7 +648,6 @@ type policiesCfg struct {
 	EgressMTLS      *version2.EgressMTLS
 	OIDC            bool
 	WAF             *version2.WAF
-	Dos             *version2.Dos
 	ErrorReturn     *version2.Return
 }
 
@@ -1153,13 +1161,18 @@ func addPoliciesCfgToLocation(cfg policiesCfg, location *version2.Location) {
 	location.EgressMTLS = cfg.EgressMTLS
 	location.OIDC = cfg.OIDC
 	location.WAF = cfg.WAF
-	location.Dos = cfg.Dos
 	location.PoliciesErrorReturn = cfg.ErrorReturn
 }
 
 func addPoliciesCfgToLocations(cfg policiesCfg, locations []version2.Location) {
 	for i := range locations {
 		addPoliciesCfgToLocation(cfg, &locations[i])
+	}
+}
+
+func addDosConfigToLocations(dosCfg *version2.Dos, locations []version2.Location) {
+	for i := range locations {
+		locations[i].Dos = dosCfg
 	}
 }
 

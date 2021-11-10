@@ -640,6 +640,7 @@ func (lbc *LoadBalancerController) createExtendedResources(resources []Resource)
 			vsEx := lbc.createVirtualServerEx(vs, impl.VirtualServerRoutes)
 			result.VirtualServerExes = append(result.VirtualServerExes, vsEx)
 		case *IngressConfiguration:
+
 			if impl.IsMaster {
 				mergeableIng := lbc.createMergeableIngresses(impl)
 				result.MergeableIngresses = append(result.MergeableIngresses, mergeableIng)
@@ -1347,6 +1348,7 @@ func (lbc *LoadBalancerController) processAppProtectDosProtectedResources(f conf
 		name := obj.GetName()
 		glog.V(3).Infof("processing dos resource: %v %v", namespace, name)
 		resources := lbc.configuration.FindResourcesForAppProtectDosProtected(namespace, name)
+		glog.V(3).Infof("found dos resources: %v ", len(resources))
 		resourceExes := lbc.createExtendedResources(resources)
 		warnings, updateErr := f(obj, resourceExes.IngressExes, resourceExes.MergeableIngresses, resourceExes.VirtualServerExes)
 		lbc.updateResourcesStatusAndEvents(resources, warnings, updateErr)
@@ -2447,7 +2449,7 @@ func (lbc *LoadBalancerController) createVirtualServerEx(virtualServer *conf_v1.
 		SecretRefs:     make(map[string]*secrets.SecretReference),
 		ApPolRefs:      make(map[string]*unstructured.Unstructured),
 		LogConfRefs:    make(map[string]*unstructured.Unstructured),
-		DosProtectedEx: &configs.DosProtectedEx{},
+		DosProtectedEx: make(map[string]*configs.DosProtectedEx),
 	}
 
 	if virtualServer.Spec.TLS != nil && virtualServer.Spec.TLS.Secret != "" {
@@ -2488,11 +2490,14 @@ func (lbc *LoadBalancerController) createVirtualServerEx(virtualServer *conf_v1.
 		glog.Warningf("Error getting App Protect resource for VirtualServer %v/%v: %v", virtualServer.Namespace, virtualServer.Name, err)
 	}
 
+	// top level dos resource for this virtual server
 	dosEx, err := lbc.generateDosProtectedEx(virtualServer.Namespace, virtualServer.Spec.Dos)
 	if err != nil {
 		glog.Warningf("Error getting App Protect Dos resource for VirtualServer %v/%v: %v", virtualServer.Namespace, virtualServer.Name, err)
 	}
-	virtualServerEx.DosProtectedEx = dosEx
+	if dosEx != nil {
+		virtualServerEx.DosProtectedEx[""] = dosEx
+	}
 
 	endpoints := make(map[string][]string)
 	externalNameSvcs := make(map[string]bool)
@@ -2566,11 +2571,11 @@ func (lbc *LoadBalancerController) createVirtualServerEx(virtualServer *conf_v1.
 			glog.Warningf("Error getting WAF policies for VirtualServer %v/%v: %v", virtualServer.Namespace, virtualServer.Name, err)
 		}
 
-		dosEx, err = lbc.generateDosProtectedEx(virtualServer.Namespace, r.Dos)
+		routeDosEx, err := lbc.generateDosProtectedEx(virtualServer.Namespace, r.Dos)
 		if err != nil {
-			glog.Warningf("Error getting Dos Protected Resources for VirtualServer (%v/%v) route (%v): %v", virtualServer.Namespace, virtualServer.Name, r.Route, err)
+			glog.Warningf("Error getting App Protect Dos resource for VirtualServer %v/%v: %v", virtualServer.Namespace, virtualServer.Name, err)
 		}
-		virtualServerEx.DosProtectedEx = dosEx
+		virtualServerEx.DosProtectedEx[r.Path] = routeDosEx
 
 		err = lbc.addOIDCSecretRefs(virtualServerEx.SecretRefs, vsRoutePolicies)
 		if err != nil {

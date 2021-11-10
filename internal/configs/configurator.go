@@ -444,7 +444,10 @@ func (cnf *Configurator) addOrUpdateOpenTracingTracerConfig(content string) erro
 
 func (cnf *Configurator) addOrUpdateVirtualServer(virtualServerEx *VirtualServerEx) (Warnings, error) {
 	apResources := cnf.updateApResourcesForVs(virtualServerEx)
-	dosResources := cnf.updateApDosResources(virtualServerEx.DosProtectedEx)
+	dosResources := map[string]*appProtectDosResources{}
+	for k, v := range virtualServerEx.DosProtectedEx {
+		dosResources[k] = cnf.updateApDosResources(v)
+	}
 
 	name := getFileNameForVirtualServer(virtualServerEx.VirtualServer)
 

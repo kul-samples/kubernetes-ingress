@@ -1,7 +1,7 @@
-apiVersion: apps/v1
+apiVersion: appprotectdos.f5.com/v1beta1
 kind: DosProtectedResources
 metadata:
-  name: dos-policy
+  name: dos-protected
 spec:
   enable: true
   name: "webapp.example.com"
