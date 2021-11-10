@@ -1,7 +1,7 @@
-apiVersion: apps/v1
+apiVersion: appprotectdos.f5.com/v1beta1
 kind: DosProtectedResources
 metadata:
-  name: dos-policy
+  name: dos-protected
 spec:
   enable: true
   name: "webapp.example.com"
@@ -11,4 +11,4 @@ spec:
   dosSecurityLog:
     enable: true
     apDosLogConf: "doslogconf"
-    dosLogDest: "127.0.0.1:5261"
+    dosLogDest: "syslog-svc.default.svc.cluster.local:514"
